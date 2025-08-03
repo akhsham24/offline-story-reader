@@ -756,4 +756,157 @@
 
         function openStory(storyId) {
             currentStory = stories.find(s => s.id === storyId);
-            if (!current
+            if (!currentStory) return;
+            
+            currentPage = currentStory.currentPage;
+            
+            // Switch to reader tab
+            switchMainTab('reader');
+            updateReader();
+        }
+
+        async function deleteStory(storyId) {
+            if (confirm('Are you sure you want to delete this story?')) {
+                stories = stories.filter(s => s.id !== storyId);
+                await mockAPI.saveUserData(currentUser.id, stories);
+                updateLibrary();
+                showAlert('Story deleted successfully', 'info');
+            }
+        }
+
+        // Reader Functions
+        function updateReader() {
+            if (!currentStory) return;
+            
+            const titleEl = document.getElementById('currentStoryTitle');
+            const contentEl = document.getElementById('readerContent');
+            const pageInfoEl = document.getElementById('pageInfo');
+            
+            titleEl.textContent = currentStory.title;
+            contentEl.innerHTML = currentStory.pages[currentPage]?.content || '<p>Page not found</p>';
+            contentEl.style.fontSize = fontSize + 'px';
+            pageInfoEl.textContent = `Page ${currentPage + 1} of ${currentStory.pageCount}`;
+            
+            // Save progress
+            currentStory.currentPage = currentPage;
+            mockAPI.saveUserData(currentUser.id, stories);
+        }
+
+        function previousPage() {
+            if (currentStory && currentPage > 0) {
+                currentPage--;
+                updateReader();
+            }
+        }
+
+        function nextPage() {
+            if (currentStory && currentPage < currentStory.pageCount - 1) {
+                currentPage++;
+                updateReader();
+            }
+        }
+
+        function changeFontSize(delta) {
+            fontSize = Math.max(12, Math.min(32, fontSize + delta));
+            if (currentStory) {
+                document.getElementById('readerContent').style.fontSize = fontSize + 'px';
+            }
+        }
+
+        function goToLibrary() {
+            switchMainTab('library');
+        }
+
+        // Settings Functions
+        async function forcSync() {
+            updateSyncStatus('syncing');
+            showAlert('Syncing data...', 'info');
+            
+            // Simulate sync
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            await mockAPI.saveUserData(currentUser.id, stories);
+            
+            updateSyncStatus('online');
+            showAlert('Sync completed successfully!', 'success');
+        }
+
+        function clearCache() {
+            if (confirm('This will delete all downloaded stories. Are you sure?')) {
+                stories = [];
+                currentStory = null;
+                currentPage = 0;
+                mockAPI.saveUserData(currentUser.id, stories);
+                updateLibrary();
+                showAlert('All stories cleared', 'info');
+            }
+        }
+
+        function updateStorageInfo() {
+            const storyCount = stories.length;
+            const totalPages = stories.reduce((sum, story) => sum + story.pageCount, 0);
+            const storageElement = document.getElementById('storageInfo');
+            if (storageElement) {
+                storageElement.textContent = `${storyCount} stories, ${totalPages} pages stored locally`;
+            }
+        }
+
+        // Event Listeners
+        document.getElementById('loginForm').addEventListener('submit', handleLogin);
+        document.getElementById('registerForm').addEventListener('submit', handleRegister);
+        document.getElementById('downloadForm').addEventListener('submit', handleDownload);
+        document.getElementById('stopDownloadBtn').addEventListener('click', stopDownload);
+
+        // Service Worker Registration for PWA
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('data:application/javascript;base64,Ly8gU2VydmljZSBXb3JrZXIgZm9yIG9mZmxpbmUgZnVuY3Rpb25hbGl0eQpzZWxmLmFkZEV2ZW50TGlzdGVuZXIoJ2luc3RhbGwnLCBldmVudCA9PiB7CiAgY29uc29sZS5sb2coJ1NlcnZpY2UgV29ya2VyIGluc3RhbGxlZCcpOwp9KTsKCnNlbGYuYWRkRXZlbnRMaXN0ZW5lcignZmV0Y2gnLCBldmVudCA9PiB7CiAgLy8gSW50ZXJjZXB0IG5ldHdvcmsgcmVxdWVzdHMgZm9yIG9mZmxpbmUgZnVuY3Rpb25hbGl0eQp9KTs=')
+                .then(() => console.log('Service Worker registered'))
+                .catch(err => console.log('Service Worker registration failed'));
+        }
+
+        // Add install prompt for PWA
+        let deferredPrompt;
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            
+            // Show install button in settings
+            const installBtn = document.createElement('button');
+            installBtn.className = 'btn';
+            installBtn.textContent = 'Install as App';
+            installBtn.onclick = async () => {
+                deferredPrompt.prompt();
+                const { outcome } = await deferredPrompt.userChoice;
+                if (outcome === 'accepted') {
+                    showAlert('App installed successfully!', 'success');
+                }
+                deferredPrompt = null;
+                installBtn.remove();
+            };
+            
+            const settingsTab = document.getElementById('settingsTab');
+            if (settingsTab) {
+                const installGroup = document.createElement('div');
+                installGroup.className = 'form-group';
+                installGroup.innerHTML = '<label>Install App</label><p>Install this app on your device for better offline experience.</p>';
+                installGroup.appendChild(installBtn);
+                settingsTab.appendChild(installGroup);
+            }
+        });
+
+        // Initialize app
+        function initApp() {
+            updateSyncStatus('offline');
+            updateStorageInfo();
+            
+            // Check if user is already logged in (in production, check for valid token)
+            const savedUser = localStorage.getItem('currentUser');
+            if (savedUser) {
+                // Auto-login logic would go here
+            }
+        }
+
+        // Start the app
+        initApp();
+    </script>
+</body>
+</html>
